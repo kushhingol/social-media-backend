@@ -1,119 +1,212 @@
-const request = require("supertest");
-const app = require("../app");
 const User = require("../models/userModel");
-const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
+const {
+  registerUser,
+  updateUserProfile,
+  deleteUserAccount,
+  getUserById,
+} = require("../controllers/userController");
 
-// Mock User model methods
+// Mock the User model
 jest.mock("../models/userModel");
 
-describe("User Management API", () => {
-  let server;
+describe("User Controller", () => {
+  let req, res, next;
 
-  beforeAll(async () => {
-    server = app.listen(5001);
+  beforeEach(() => {
+    req = {
+      body: {},
+      params: {},
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+    next = jest.fn();
   });
 
-  afterAll(async () => {
-    await server.close();
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
-  describe("User Registration", () => {
+  describe("registerUser", () => {
+    it("should return 400 if user already exists", async () => {
+      User.findOne.mockResolvedValue({ email: "test@test.com" });
+      req.body = {
+        username: "test",
+        email: "test@test.com",
+        password: "123456",
+      };
+
+      await registerUser(req, res, next);
+
+      expect(User.findOne).toHaveBeenCalledWith({ email: "test@test.com" });
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ message: "User already exists" });
+    });
+
     it("should register a new user", async () => {
+      User.findOne.mockResolvedValue(null);
       User.create.mockResolvedValue({
-        _id: "507f191e810c19729de860ea",
-        username: "testuser",
-        email: "test@example.com",
+        _id: "userId",
+        username: "test",
+        email: "test@test.com",
+        password: "123456",
       });
+      req.body = {
+        username: "test",
+        email: "test@test.com",
+        password: "123456",
+      };
 
-      const res = await request(server)
-        .post("/api/users/register")
-        .send({
-          username: "testuser",
-          email: "test@example.com",
-          password: "password",
-        });
+      await registerUser(req, res, next);
 
-      expect(res.statusCode).toEqual(201);
-      expect(res.body).toHaveProperty("_id");
-      expect(res.body).toHaveProperty("username", "testuser");
-      expect(res.body).toHaveProperty("email", "test@example.com");
+      expect(User.findOne).toHaveBeenCalledWith({ email: "test@test.com" });
+      expect(User.create).toHaveBeenCalledWith({
+        username: "test",
+        email: "test@test.com",
+        password: "123456",
+      });
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        _id: "userId",
+        username: "test",
+        email: "test@test.com",
+      });
+    });
+
+    it("should handle invalid user data", async () => {
+      User.findOne.mockResolvedValue(null);
+      User.create.mockResolvedValue(null);
+      req.body = {
+        username: "test",
+        email: "test@test.com",
+        password: "123456",
+      };
+
+      await registerUser(req, res, next);
+
+      expect(User.create).toHaveBeenCalledWith({
+        username: "test",
+        email: "test@test.com",
+        password: "123456",
+      });
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ message: "Invalid user data" });
     });
   });
 
-  describe("Update User Profile", () => {
+  describe("updateUserProfile", () => {
+    it("should return 404 if user is not found", async () => {
+      User.findById.mockResolvedValue(null);
+      req.params.userId = "userId";
+      req.body = { username: "newUsername", email: "new@test.com" };
+
+      await updateUserProfile(req, res, next);
+
+      expect(User.findById).toHaveBeenCalledWith("userId");
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ message: "User not found" });
+    });
+
     it("should update user profile", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
-
-      User.findById.mockResolvedValue({
-        _id: "507f191e810c19729de860ea",
-        username: "testuser",
-        email: "test@example.com",
+      const user = {
+        _id: "userId",
+        username: "oldUsername",
+        email: "old@test.com",
         save: jest.fn().mockResolvedValue({
-          _id: "507f191e810c19729de860ea",
-          username: "updateduser",
-          email: "updated@example.com",
+          _id: "userId",
+          username: "newUsername",
+          email: "new@test.com",
         }),
+      };
+      User.findById.mockResolvedValue(user);
+      req.params.userId = "userId";
+      req.body = { username: "newUsername", email: "new@test.com" };
+
+      await updateUserProfile(req, res, next);
+
+      expect(User.findById).toHaveBeenCalledWith("userId");
+      expect(user.username).toBe("newUsername");
+      expect(user.email).toBe("new@test.com");
+      expect(user.save).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        _id: "userId",
+        username: "newUsername",
+        email: "new@test.com",
       });
-
-      const res = await request(server)
-        .put("/api/users/507f191e810c19729de860ea")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ username: "updateduser", email: "updated@example.com" });
-
-      expect(res.statusCode).toEqual(200);
-      expect(res.body).toHaveProperty("username", "updateduser");
-      expect(res.body).toHaveProperty("email", "updated@example.com");
     });
   });
 
-  describe("Delete User Account", () => {
-    it("should delete user account", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
+  describe("deleteUserAccount", () => {
+    it("should return 404 if user is not found", async () => {
+      User.findById.mockResolvedValue(null);
+      req.params.userId = "userId";
 
-      User.findById.mockResolvedValue({
-        _id: "507f191e810c19729de860ea",
-        username: "testuser",
-        email: "test@example.com",
+      await deleteUserAccount(req, res, next);
+
+      expect(User.findById).toHaveBeenCalledWith("userId");
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ message: "User not found" });
+    });
+
+    it("should delete the user account", async () => {
+      const user = {
+        _id: "userId",
         remove: jest.fn().mockResolvedValue({}),
+      };
+      User.findById.mockResolvedValue(user);
+      req.params.userId = "userId";
+
+      await deleteUserAccount(req, res, next);
+
+      expect(User.findById).toHaveBeenCalledWith("userId");
+      expect(user.remove).toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        message: "User account deleted successfully",
       });
-
-      const res = await request(server)
-        .delete("/api/users/507f191e810c19729de860ea")
-        .set("Authorization", `Bearer ${token}`);
-
-      expect(res.statusCode).toEqual(200);
-      expect(res.body).toHaveProperty(
-        "message",
-        "User account deleted successfully"
-      );
     });
   });
 
-  describe("Get User by UserId", () => {
-    it("should get user by userId", async () => {
-      User.findById.mockResolvedValue({
-        _id: "507f191e810c19729de860ea",
-        username: "testuser",
-        email: "test@example.com",
+  describe("getUserById", () => {
+    it("should return 404 if user is not found", async () => {
+      User.findById.mockReturnValue({
+        select: jest.fn().mockResolvedValue(null),
       });
+      req.params.userId = "userId";
 
-      const res = await request(server).get(
-        "/api/users/507f191e810c19729de860ea"
-      );
+      await getUserById(req, res, next);
 
-      expect(res.statusCode).toEqual(200);
-      expect(res.body).toHaveProperty("_id", "507f191e810c19729de860ea");
-      expect(res.body).toHaveProperty("username", "testuser");
-      expect(res.body).toHaveProperty("email", "test@example.com");
+      expect(User.findById).toHaveBeenCalledWith("userId");
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ message: "User not found" });
+    });
+
+    it("should return user details excluding password", async () => {
+      const user = {
+        _id: "userId",
+        username: "test",
+        email: "test@test.com",
+        select: (_) =>
+          jest.fn().mockResolvedValue({
+            _id: "userId",
+            username: "test",
+            email: "test@test.com",
+          }),
+      };
+      User.findById.mockReturnValue({
+        select: jest.fn().mockResolvedValue(user),
+      });
+      req.params.userId = "userId";
+
+      await getUserById(req, res, next);
+
+      expect(User.findById).toHaveBeenCalledWith("userId");
+      expect(User.findById().select).toHaveBeenCalledWith("-password");
+      expect(res.json).toHaveBeenCalledWith({
+        _id: "userId",
+        username: "test",
+        email: "test@test.com",
+      });
     });
   });
 });

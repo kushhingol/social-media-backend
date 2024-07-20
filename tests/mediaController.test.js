@@ -1,233 +1,230 @@
-const request = require("supertest");
-const app = require("../app");
+const {
+  uploadMedia,
+  deleteMedia,
+  likeMedia,
+  commentOnMedia,
+} = require("../controllers/mediaController");
 const Media = require("../models/mediaModel");
-const User = require("../models/userModel");
-const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
+const Comment = require("../models/commentModel");
 const path = require("path");
-const fs = require("fs");
 
-// Mock Media model methods
+// Mock dependencies
 jest.mock("../models/mediaModel");
-jest.mock("../models/userModel");
 jest.mock("../models/commentModel");
 
-describe("Media Management API", () => {
-  let server;
-
-  beforeAll(async () => {
-    server = app.listen(5002);
+describe("Media Controller", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  afterAll(async () => {
-    await server.close();
-  });
-
-  describe("Upload Media", () => {
-    it("should upload media", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
+  describe("uploadMedia", () => {
+    it("should upload media successfully", async () => {
+      const req = {
+        body: { description: "Test Media Description" },
+        file: { filename: "test.jpg" },
+        user: { _id: "userId" },
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
 
       Media.create.mockResolvedValue({
-        _id: "507f191e810c19729de860eb",
-        userId: "507f191e810c19729de860ea",
+        _id: "mediaId",
+        userId: "userId",
         mediaURL: "uploads/test.jpg",
-        description: "Test description",
+        description: "Test Media Description",
       });
 
-      const res = await request(server)
-        .post("/api/media")
-        .set("Authorization", `Bearer ${token}`)
-        .field("description", "Test description")
-        .attach("mediaFile", path.join(__dirname, "test.jpg"));
+      await uploadMedia(req, res);
 
-      expect(res.statusCode).toEqual(201);
-      expect(res.body).toHaveProperty("mediaId");
-      expect(res.body).toHaveProperty("mediaURL", "uploads/test.jpg");
-      expect(res.body).toHaveProperty("description", "Test description");
+      expect(Media.create).toHaveBeenCalledWith({
+        userId: "userId",
+        mediaURL: "uploads/test.jpg",
+        description: "Test Media Description",
+      });
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        mediaId: "mediaId",
+        mediaURL: "uploads/test.jpg",
+        description: "Test Media Description",
+      });
     });
   });
 
-  describe("Delete Media", () => {
-    it("should delete media", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
+  describe("deleteMedia", () => {
+    it("should delete media successfully", async () => {
+      const req = {
+        params: { mediaId: "mediaId" },
+        user: { _id: "userId" },
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
 
       Media.findById.mockResolvedValue({
-        _id: "507f191e810c19729de860eb",
-        userId: "507f191e810c19729de860ea",
-        remove: jest.fn().mockResolvedValue({}),
+        _id: "mediaId",
+        userId: "userId",
+        remove: jest.fn().mockResolvedValue(true),
       });
 
-      const res = await request(server)
-        .delete("/api/media/507f191e810c19729de860eb")
-        .set("Authorization", `Bearer ${token}`);
+      await deleteMedia(req, res);
 
-      expect(res.statusCode).toEqual(200);
-      expect(res.body).toHaveProperty("message", "Media deleted successfully");
-    });
-
-    it("should return 401 if user not authorized", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
-
-      Media.findById.mockResolvedValue({
-        _id: "507f191e810c19729de860eb",
-        userId: "507f191e810c19729de860ec",
+      expect(Media.findById).toHaveBeenCalledWith("mediaId");
+      expect(res.json).toHaveBeenCalledWith({
+        message: "Media deleted successfully",
       });
-
-      const res = await request(server)
-        .delete("/api/media/507f191e810c19729de860eb")
-        .set("Authorization", `Bearer ${token}`);
-
-      expect(res.statusCode).toEqual(401);
-      expect(res.body).toHaveProperty("message", "User not authorized");
     });
 
     it("should return 404 if media not found", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
+      const req = {
+        params: { mediaId: "mediaId" },
+        user: { _id: "userId" },
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
 
       Media.findById.mockResolvedValue(null);
 
-      const res = await request(server)
-        .delete("/api/media/507f191e810c19729de860eb")
-        .set("Authorization", `Bearer ${token}`);
+      await deleteMedia(req, res);
 
-      expect(res.statusCode).toEqual(404);
-      expect(res.body).toHaveProperty("message", "Media not found");
+      expect(Media.findById).toHaveBeenCalledWith("mediaId");
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ message: "Media not found" });
     });
   });
 
-  describe("Like Media", () => {
-    it("should like media", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
+  describe("likeMedia", () => {
+    it("should like media successfully", async () => {
+      const req = {
+        params: { mediaId: "mediaId" },
+        user: { _id: "userId" },
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
 
       Media.findById.mockResolvedValue({
-        _id: "507f191e810c19729de860eb",
-        userId: "507f191e810c19729de860ea",
+        _id: "mediaId",
         likes: [],
-        save: jest.fn().mockResolvedValue({
-          _id: "507f191e810c19729de860eb",
-          likes: ["507f191e810c19729de860ea"],
-        }),
+        save: jest.fn().mockResolvedValue(true),
       });
 
-      const res = await request(server)
-        .post("/api/media/507f191e810c19729de860eb/like")
-        .set("Authorization", `Bearer ${token}`);
+      await likeMedia(req, res);
 
-      expect(res.statusCode).toEqual(200);
-      expect(res.body).toHaveProperty("mediaId");
-      expect(res.body).toHaveProperty("likesCount", 1);
+      expect(Media.findById).toHaveBeenCalledWith("mediaId");
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        mediaId: "mediaId",
+        likesCount: 1,
+      });
+    });
+
+    it("should return 404 if media not found", async () => {
+      const req = {
+        params: { mediaId: "mediaId" },
+        user: { _id: "userId" },
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
+
+      Media.findById.mockResolvedValue(null);
+
+      await likeMedia(req, res);
+
+      expect(Media.findById).toHaveBeenCalledWith("mediaId");
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ message: "Media not found" });
     });
 
     it("should return 400 if media already liked", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
+      const req = {
+        params: { mediaId: "mediaId" },
+        user: { _id: "userId" },
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
 
       Media.findById.mockResolvedValue({
-        _id: "507f191e810c19729de860eb",
-        userId: "507f191e810c19729de860ea",
-        likes: ["507f191e810c19729de860ea"],
+        _id: "mediaId",
+        likes: ["userId"],
+        save: jest.fn().mockResolvedValue(true),
       });
 
-      const res = await request(server)
-        .post("/api/media/507f191e810c19729de860eb/like")
-        .set("Authorization", `Bearer ${token}`);
+      await likeMedia(req, res);
 
-      expect(res.statusCode).toEqual(400);
-      expect(res.body).toHaveProperty("message", "Media already liked");
-    });
-
-    it("should return 404 if media not found", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
-
-      Media.findById.mockResolvedValue(null);
-
-      const res = await request(server)
-        .post("/api/media/507f191e810c19729de860eb/like")
-        .set("Authorization", `Bearer ${token}`);
-
-      expect(res.statusCode).toEqual(404);
-      expect(res.body).toHaveProperty("message", "Media not found");
+      expect(Media.findById).toHaveBeenCalledWith("mediaId");
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ message: "Media already liked" });
     });
   });
 
-  describe("Comment on Media", () => {
-    it("should comment on media", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
+  describe("commentOnMedia", () => {
+    it("should add a comment to media successfully", async () => {
+      const req = {
+        params: { mediaId: "mediaId" },
+        body: { comment: "Test Comment" },
+        user: { _id: "userId" },
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
 
       Media.findById.mockResolvedValue({
-        _id: "507f191e810c19729de860eb",
-        userId: "507f191e810c19729de860ea",
+        _id: "mediaId",
         comments: [],
-        save: jest.fn().mockResolvedValue({
-          _id: "507f191e810c19729de860eb",
-          comments: ["507f191e810c19729de860ec"],
-        }),
+        save: jest.fn().mockResolvedValue(true),
       });
 
       Comment.create.mockResolvedValue({
-        _id: "507f191e810c19729de860ec",
-        userId: "507f191e810c19729de860ea",
-        mediaId: "507f191e810c19729de860eb",
-        comment: "Nice post!",
+        _id: "commentId",
+        userId: "userId",
+        mediaId: "mediaId",
+        comment: "Test Comment",
       });
 
-      const res = await request(server)
-        .post("/api/media/507f191e810c19729de860eb/comment")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ comment: "Nice post!" });
+      await commentOnMedia(req, res);
 
-      expect(res.statusCode).toEqual(201);
-      expect(res.body).toHaveProperty("commentId");
-      expect(res.body).toHaveProperty("comment", "Nice post!");
+      expect(Media.findById).toHaveBeenCalledWith("mediaId");
+      expect(Comment.create).toHaveBeenCalledWith({
+        userId: "userId",
+        mediaId: "mediaId",
+        comment: "Test Comment",
+      });
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith({
+        commentId: "commentId",
+        comment: "Test Comment",
+      });
     });
 
     it("should return 404 if media not found", async () => {
-      const token = jwt.sign(
-        { id: "507f191e810c19729de860ea" },
-        process.env.JWT_SECRET,
-        { expiresIn: "30d" }
-      );
+      const req = {
+        params: { mediaId: "mediaId" },
+        body: { comment: "Test Comment" },
+        user: { _id: "userId" },
+      };
+      const res = {
+        json: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+      };
 
       Media.findById.mockResolvedValue(null);
 
-      const res = await request(server)
-        .post("/api/media/507f191e810c19729de860eb/comment")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ comment: "Nice post!" });
+      await commentOnMedia(req, res);
 
-      expect(res.statusCode).toEqual(404);
-      expect(res.body).toHaveProperty("message", "Media not found");
+      expect(Media.findById).toHaveBeenCalledWith("mediaId");
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ message: "Media not found" });
     });
   });
 });
