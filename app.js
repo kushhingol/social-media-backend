@@ -1,5 +1,4 @@
 const express = require("express");
-const bodyParser = require("body-parser");
 const connectDB = require("./config/db");
 
 const app = express();
@@ -8,7 +7,7 @@ const app = express();
 connectDB();
 
 // Middleware
-app.use(bodyParser.json());
+app.use(express.json());
 
 // Routes
 app.use("/api/auth", require("./routes/authRoutes"));
