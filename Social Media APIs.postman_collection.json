@@ -363,6 +363,82 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Chat Feature",
+			"item": [
+				{
+					"name": "Send Message",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY2YTc3ZGVkNjhhODVkNTZhZjQzMjU2OSIsImlhdCI6MTcyMjI1Mjc5OCwiZXhwIjoxNzI0ODQ0Nzk4fQ.jVArJwXzvjwnaHHBSwZYNC42Dul3vKLxsjce9BOtz_A",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"receiverId\": \"66a77dc868a85d56af432566\",\n    \"message\": \"Hello this is message\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/chat",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"chat"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Message (UserId in the query param is either sender id or receiver id)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/chat/message/{{userId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"chat",
+								"message",
+								"{{userId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
 		}
 	]
 }
