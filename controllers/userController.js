@@ -36,6 +36,10 @@ const updateUserProfile = async (req, res) => {
   if (user) {
     user.username = req.body.username || user.username;
     user.email = req.body.email || user.email;
+    user.phone = req.body.phone || user.phone;
+    user.dob = req.body.dob || user.dob;
+    user.gender = req.body.gender || user.gender;
+    user.language = req.body.language || user.language;
 
     const updatedUser = await user.save();
 
@@ -43,6 +47,10 @@ const updateUserProfile = async (req, res) => {
       _id: updatedUser._id,
       username: updatedUser.username,
       email: updatedUser.email,
+      phone: updatedUser.phone,
+      dob: updatedUser.dob,
+      gender: updatedUser.gender,
+      language: updatedUser.language,
     });
   } else {
     res.status(404).json({ message: "User not found" });
@@ -74,7 +82,15 @@ const getUserById = async (req, res) => {
   const user = await User.findById(req.params.userId).select("-password");
 
   if (user) {
-    res.json({ _id: user._id, username: user.username, email: user.email });
+    res.json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      dob: user.dob,
+      gender: user.gender,
+      phone: user.phone,
+      language: user.language,
+    });
   } else {
     res.status(404).json({ message: "User not found" });
   }
